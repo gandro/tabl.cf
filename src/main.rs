@@ -16,6 +16,7 @@ extern crate futures;
 extern crate chrono;
 
 extern crate termcolor;
+extern crate num_cpus;
 
 use hyper::client::{Client, HttpConnector};
 use hyper::rt;
@@ -26,6 +27,7 @@ use hyper::{Method, StatusCode};
 use hyper_tls::HttpsConnector;
 
 use failure::Error;
+use futures::stream::Stream;
 use futures::future::{self, Future};
 
 mod backend;
@@ -71,7 +73,7 @@ where
 
 fn router(
     req: Request<Body>,
-    client: &HttpsClient,
+    client: &backend::Client,
 ) -> impl Future<Item = Response<Body>, Error = Error> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/:help") | (&Method::GET, "/help") => {
@@ -89,9 +91,9 @@ fn router(
         
             let station = &path[1..];
             Box::new(
-                backend::Request::new(client, station)
+                client
+                    .request(station)
                     .submit()
-                    //.map(|s| Response::new(Body::from(format!("{:#?}", s)))),
                     .and_then(move |station| {
                         station.ansi_write(&mut term)?;
                         let resp = Response::builder()
@@ -111,15 +113,14 @@ fn main() {
 
     let addr = ([127, 0, 0, 1], 1337).into();
 
-    let https = HttpsConnector::new(4).unwrap();
-    let client = Client::builder().build::<_, hyper::Body>(https);
+    let client = backend::Client::new().unwrap();
 
     let new_service = move || {
         let client = client.clone();
         service_fn(move |req| {
             router(req, &client).or_else(|err| {
                 error!("internal server error: {}", err);
-                Ok::<_, !>(
+                Ok::<_, hyper::Error>(
                     Response::builder()
                         .status(StatusCode::INTERNAL_SERVER_ERROR)
                         .body(Body::from(err.to_string()))

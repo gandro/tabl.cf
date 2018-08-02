@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+
 use std::fmt;
 use std::io::{self, Write};
 
@@ -7,36 +7,59 @@ use failure::Error;
 use chrono::{DateTime, Local};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 
+use hyper;
+use hyper::client::HttpConnector;
+use hyper_tls::HttpsConnector;
+
 use failure;
 use futures::future::{self, Either, Future};
 use futures::stream::Stream;
-use hyper;
 use serde_json;
+use num_cpus;
 
 use termcolor::*;
 
-use super::HttpsClient;
+type HttpsClient = hyper::Client<HttpsConnector<HttpConnector>>;
 
-#[derive(Debug, Clone)]
-pub struct Request<'a> {
-    client: &'a HttpsClient,
-    station: &'a str,
-    limit: u32,
-    date: Option<&'a str>,
-    time: Option<&'a str>,
+#[derive(Clone, Debug)]
+pub struct Client {
+    client: HttpsClient,
 }
 
-impl<'a> Request<'a> {
-    pub fn new(client: &'a HttpsClient, station: &'a str) -> Self {
+impl Client {
+    pub fn new() -> io::Result<Self> {
+        let cpus = num_cpus::get();
+        let connector = HttpsConnector::new(cpus).
+            map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let client = hyper::Client::builder()
+            .build::<_, hyper::Body>(connector);
+
+        Ok(Client {
+            client: client
+        })
+    }
+
+    pub fn request<'a, 'b>(&'a self, station: &'b str) -> Request<'a, 'b> {
         Request {
-            client: client,
+            client: &self.client,
             station: station,
             limit: 10,
             date: None,
             time: None,
         }
     }
+}
 
+#[derive(Debug, Clone)]
+pub struct Request<'a, 'b> {
+    client: &'a HttpsClient,
+    station: &'b str,
+    limit: u32,
+    date: Option<&'a str>,
+    time: Option<&'a str>,
+}
+
+impl<'a, 'b> Request<'a, 'b> {
     pub fn submit(&self) -> impl Future<Item = Stationboard, Error = Error> {
         let url = format!(
             "https://timetable.search.ch/api/stationboard.json?stop={}&show_delays=1",
@@ -222,12 +245,13 @@ impl<'de> Visitor<'de> for CoordVisitor {
     where
         E: de::Error,
     {
-        match value.try_into() {
-            Ok(v) => self.visit_u32(v),
-            Err(_) => Err(de::Error::invalid_value(
+        if value > 0 && value <= u32::max_value().into() {
+            self.visit_u32(value as u32)
+        } else {
+            Err(de::Error::invalid_value(
                 de::Unexpected::Signed(value),
                 &self,
-            )),
+            ))
         }
     }
 
@@ -235,12 +259,13 @@ impl<'de> Visitor<'de> for CoordVisitor {
     where
         E: de::Error,
     {
-        match value.try_into() {
-            Ok(v) => self.visit_u32(v),
-            Err(_) => Err(de::Error::invalid_value(
+        if value <= u32::max_value().into() {
+            self.visit_u32(value as u32)
+        } else {
+            Err(de::Error::invalid_value(
                 de::Unexpected::Unsigned(value),
                 &self,
-            )),
+            ))
         }
     }
 

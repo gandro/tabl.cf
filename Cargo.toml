@@ -1,6 +1,6 @@
 [package]
 authors = ["Sebastian Wicki <gandro@gmx.net>"]
-name = "depart.sh"
+name = "depart-sh"
 version = "0.1.0"
 
 [dependencies]
@@ -9,15 +9,12 @@ chrono = "0.4.2"
 env_logger = "0.5.10"
 failure = "0.1.1"
 futures = "0.1.21"
+hyper = "0.12"
+hyper-tls = "0.2"
 log = "0.4.1"
+num_cpus = "1.8.0"
 serde = "1.0.53"
 serde_derive = "1.0.53"
 serde_json = "1.0.17"
 termcolor = "0.3.6"
 tokio = "0.1.6"
-
-[dependencies.hyper]
-git = "https://github.com/hyperium/hyper"
-
-[dependencies.hyper-tls]
-git = "https://github.com/hyperium/hyper-tls"
