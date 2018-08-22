@@ -1,6 +1,7 @@
-extern crate env_logger;
+extern crate bytes;
 extern crate hyper;
 extern crate hyper_tls;
+extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
 
@@ -15,20 +16,22 @@ extern crate futures;
 
 extern crate chrono;
 
-extern crate termcolor;
 extern crate num_cpus;
+extern crate termcolor;
 
-use hyper::client::{Client, HttpConnector};
+use std::io;
+
+//use hyper::client::{Client, HttpConnector};
 use hyper::rt;
 use hyper::service::service_fn;
 use hyper::{Body, Request, Response, Server};
 use hyper::{Method, StatusCode};
 
-use hyper_tls::HttpsConnector;
+//use hyper_tls::HttpsConnector;
 
 use failure::Error;
-use futures::stream::Stream;
 use futures::future::{self, Future};
+use futures::stream::Stream;
 
 mod backend;
 mod terminal;
@@ -36,103 +39,78 @@ mod terminal;
 use self::backend::*;
 use self::terminal::*;
 
-type HttpsClient = Client<HttpsConnector<HttpConnector>>;
+type ResponseFuture = Box<Future<Item = Response<Body>, Error = Error> + Send>;
 
-/*fn fetch(client: &HttpsClient, station: &str) -> impl Future<Item=Body, Error=Error> {
+fn lookup(client: &Client, station: &str) -> ResponseFuture {
+    let mut terminal = Terminal::ansi();
+    let resp = client.request(station).submit().and_then(move |station| {
+        station.ansi_write(&mut terminal)?;
+        let resp = Response::builder()
+            .header("Content-Type", terminal.content_type())
+            .body(Body::from(terminal.into_bytes()))
+            .expect("response builder should not fail");
+        Ok(resp)
+    });
 
-    println!("{:?}", station);
-    let url = format!(
-        "https://timetable.search.ch/api/stationboard.json?stop={}&show_delays=1",
-        station
-    );
-    let url = url.parse::<hyper::Uri>().unwrap();
-    client.get(url).map_err(Error::from)
-        .and_then(|res| {
-            res.into_body().concat2().map_err(Error::from).and_then(|body| {
-                let mut buf = Vec::new();
-                let s: Stationboard = serde_json::from_slice(&body)?;              
-                s.ansi_write(&mut buf)?;
-                Ok(Body::from(buf))
-            })
-    })
-}*/
-
-fn respond<T>(
-    status: StatusCode,
-    payload: T,
-) -> Box<Future<Item = Response<Body>, Error = Error> + Send>
-where
-    T: Into<Body>,
-{
-    let response = Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .body(payload.into())
-        .unwrap();
-    Box::new(future::ok(response))
+    Box::new(resp)
 }
 
-fn router(
-    req: Request<Body>,
-    client: &backend::Client,
-) -> impl Future<Item = Response<Body>, Error = Error> {
+fn usage() -> ResponseFuture {
+    let usage = future::ok(Response::new(Body::from("help page here")));
+
+    Box::new(usage)
+}
+
+fn search(client: &Client, quer: &str) -> ResponseFuture {
+    unimplemented!()
+}
+
+fn not_found() -> ResponseFuture {
+    let not_found = future::ok(Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body(Body::from("Not Found"))
+        .unwrap());
+
+    Box::new(not_found)
+}
+
+fn route(req: Request<Body>, client: &backend::Client) -> ResponseFuture {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/:help") | (&Method::GET, "/help") => {
-            respond(StatusCode::OK, "help page here")
+            usage()
         }
         (&Method::GET, path) if path.starts_with("/~") => {
-            respond(StatusCode::OK, format!("searching for: {}", &path[2..]))
+            let query = &path[2..];
+            search(client, query)
         }
         (&Method::GET, path) if path.starts_with("/") => {
-            let mut term = match req.headers().get(hyper::header::ACCEPT) {
-                Some(accepted) if accepted.to_str().unwrap().contains("text/html") => Terminal::html(),
-                Some(_) => Terminal::ansi(),
-                None => Terminal::plain(),
-            };
-        
             let station = &path[1..];
-            Box::new(
-                client
-                    .request(station)
-                    .submit()
-                    .and_then(move |station| {
-                        station.ansi_write(&mut term)?;
-                        let resp = Response::builder()
-                            .header("Content-Type", term.content_type())
-                            .body(term.body())
-                            .expect("response builder should not fail");
-                        Ok(resp)
-                    })
-            )
+            lookup(client, station)
         }
-        _ => respond(StatusCode::NOT_FOUND, "Not Found"),
+        _ => not_found(),
     }
 }
 
+fn report_error(err: Error) -> Result<Response<Body>, hyper::Error> {
+    error!("internal server error: {}", err);
+    Ok(Response::builder()
+        .status(StatusCode::INTERNAL_SERVER_ERROR)
+        .body(Body::from(err.to_string()))
+        .unwrap())
+}
+
 fn main() {
-    env_logger::init();
+    pretty_env_logger::init();
 
-    let addr = ([127, 0, 0, 1], 1337).into();
-
-    let client = backend::Client::new().unwrap();
-
-    let new_service = move || {
-        let client = client.clone();
-        service_fn(move |req| {
-            router(req, &client).or_else(|err| {
-                error!("internal server error: {}", err);
-                Ok::<_, hyper::Error>(
-                    Response::builder()
-                        .status(StatusCode::INTERNAL_SERVER_ERROR)
-                        .body(Body::from(err.to_string()))
-                        .unwrap(),
-                )
-            })
-        })
-    };
+    let addr = ([0, 0, 0, 0], 8080).into();
 
     let server = Server::bind(&addr)
-        .serve(new_service)
-        .map_err(|e| error!("server error: {:?}", e));
+        .serve(|| -> Result<_, io::Error> {
+            let client = backend::Client::new()?;
+            Ok(service_fn(move |req| {
+                route(req, &client).or_else(report_error)
+            }))
+        }).map_err(|e| error!("server error: {:?}", e));
 
     println!("Listening on http://{}", addr);
 

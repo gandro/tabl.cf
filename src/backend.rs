@@ -1,4 +1,3 @@
-
 use std::fmt;
 use std::io::{self, Write};
 
@@ -14,8 +13,8 @@ use hyper_tls::HttpsConnector;
 use failure;
 use futures::future::{self, Either, Future};
 use futures::stream::Stream;
-use serde_json;
 use num_cpus;
+use serde_json;
 
 use termcolor::*;
 
@@ -29,14 +28,11 @@ pub struct Client {
 impl Client {
     pub fn new() -> io::Result<Self> {
         let cpus = num_cpus::get();
-        let connector = HttpsConnector::new(cpus).
-            map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-        let client = hyper::Client::builder()
-            .build::<_, hyper::Body>(connector);
+        let connector =
+            HttpsConnector::new(cpus).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let client = hyper::Client::builder().build::<_, hyper::Body>(connector);
 
-        Ok(Client {
-            client: client
-        })
+        Ok(Client { client: client })
     }
 
     pub fn request<'a, 'b>(&'a self, station: &'b str) -> Request<'a, 'b> {
@@ -136,7 +132,8 @@ impl Response {
             } => Ok(Stationboard { stop, connections }),
             Response {
                 ref mut messages, ..
-            } if !messages.is_empty() =>
+            }
+                if !messages.is_empty() =>
             {
                 Err(failure::err_msg(messages.pop().unwrap()))
             }

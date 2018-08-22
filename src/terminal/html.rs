@@ -1,12 +1,10 @@
 use std::io::{self, Write};
-use termcolor::{WriteColor, Ansi, NoColor, Color, ColorSpec};
+use termcolor::{Ansi, Color, ColorSpec, NoColor, WriteColor};
 
 pub struct Html<W> {
     writer: W,
     span_opened: bool,
 }
-
-
 
 impl<W: Write> Html<W> {
     pub fn new(mut writer: W, title: &str) -> io::Result<Self> {
@@ -14,8 +12,9 @@ impl<W: Write> Html<W> {
             writer: writer,
             span_opened: false,
         };
-    
-        html.writer.write_all(b"<!doctype html><html lang=en><head><meta charset=utf-8><title>")?;
+
+        html.writer
+            .write_all(b"<!doctype html><html lang=en><head><meta charset=utf-8><title>")?;
         html.write_html_encoded(title)?;
         html.writer.write_all(b"</title></head><body style=\"background-color: #000; color: #fff; font-family: monospace; white-space: pre;\">")?;
 
@@ -23,26 +22,32 @@ impl<W: Write> Html<W> {
     }
 
     /// Consume this `Html` value and return the inner writer.
-    pub fn into_inner(self) -> W { self.writer }
+    pub fn into_inner(self) -> W {
+        self.writer
+    }
 
     /// Return a reference to the inner writer.
-    pub fn get_ref(&self) -> &W { &self.writer }
+    pub fn get_ref(&self) -> &W {
+        &self.writer
+    }
 
     /// Return a mutable reference to the inner writer.
-    pub fn get_mut(&mut self) -> &mut W { &mut self.writer }
+    pub fn get_mut(&mut self) -> &mut W {
+        &mut self.writer
+    }
 
     fn write_html_encoded(&mut self, s: &str) -> io::Result<()> {
-         for b in s.as_bytes() {
+        for b in s.as_bytes() {
             match b {
                 b'"' => self.writer.write_all(b"&quot;")?,
                 b'&' => self.writer.write_all(b"&amp;")?,
-                b'\'' =>self.writer.write_all(b"&#x27;")?,
+                b'\'' => self.writer.write_all(b"&#x27;")?,
                 b'<' => self.writer.write_all(b"&lt;")?,
                 b'>' => self.writer.write_all(b"&gt;")?,
                 byte => self.writer.write_all(&[*byte])?,
-             }
-         }
-         Ok(())
+            }
+        }
+        Ok(())
     }
 
     fn write_css_color(&mut self, color: &Color) -> io::Result<()> {
@@ -80,7 +85,7 @@ impl<W: Write> WriteColor for Html<W> {
         if self.span_opened {
             self.write_all(b"</span>")?;
         }
-        
+
         self.write_all(b"<span style=\"")?;
         if let Some(color) = spec.fg() {
             self.write_all(b"color:")?;

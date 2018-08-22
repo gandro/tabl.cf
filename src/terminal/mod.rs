@@ -1,13 +1,12 @@
-use std::io::{self, Write};
-use termcolor::{WriteColor, Ansi, NoColor, Color, ColorSpec};
-
-use hyper::{Response, Body};
 use self::html::Html;
+use bytes::Bytes;
+use std::io::{self, Write};
+use termcolor::{Ansi, Color, ColorSpec, NoColor, WriteColor};
 
 mod html;
 
 pub struct Terminal {
-    w: TerminalImpl<Vec<u8>>
+    w: TerminalImpl<Vec<u8>>,
 }
 
 impl Terminal {
@@ -25,17 +24,18 @@ impl Terminal {
 
     pub fn html() -> Self {
         Terminal {
-            w: TerminalImpl::Html(Html::new(Vec::new(), "<todo title>")
-                .expect("writing to vec should not fail"))
+            w: TerminalImpl::Html(
+                Html::new(Vec::new(), "<todo title>").expect("writing to vec should not fail"),
+            ),
         }
     }
 
     pub fn content_type(&self) -> &'static str {
         self.w.content_type()
     }
-    
-    pub fn body(self) -> Body {
-        Body::from(self.w.into_inner())
+
+    pub fn into_bytes(self) -> Bytes {
+        Bytes::from(self.w.into_inner())
     }
 }
 
