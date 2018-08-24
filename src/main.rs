@@ -79,6 +79,9 @@ fn route(req: Request<Body>, client: &backend::Client) -> ResponseFuture {
         (&Method::GET, "/:help") | (&Method::GET, "/help") => {
             usage()
         }
+        (&Method::GET, "/favicon.ico") => {
+            not_found()
+        }
         (&Method::GET, path) if path.starts_with("/~") => {
             let query = &path[2..];
             search(client, query)
