@@ -188,7 +188,7 @@ impl Stationboard {
             let bg = colors.next().and_then(parse_ansi_color);
             let fg = colors.next().and_then(parse_ansi_color);
             w.set_color(ColorSpec::new().set_bold(true).set_fg(fg).set_bg(bg))?;
-            write!(&mut w, "{: ^3}", &c.line)?;
+            write!(&mut w, "{: ^5}", &c.line)?;
             w.reset()?;
             write!(&mut w, " {: <30}", &c.terminal.name)?;
             write!(&mut w, " {}", c.time.format("%H:%M"))?;
