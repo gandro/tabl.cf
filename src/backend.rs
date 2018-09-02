@@ -1,5 +1,5 @@
 use std::fmt;
-use std::io::{self, Write};
+use std::io;
 
 use failure::Error;
 

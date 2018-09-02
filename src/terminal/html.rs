@@ -1,5 +1,5 @@
 use std::io::{self, Write};
-use termcolor::{Ansi, Color, ColorSpec, NoColor, WriteColor};
+use termcolor::{Color, ColorSpec, WriteColor};
 
 pub struct Html<W> {
     writer: W,
@@ -7,7 +7,7 @@ pub struct Html<W> {
 }
 
 impl<W: Write> Html<W> {
-    pub fn new(mut writer: W, title: &str) -> io::Result<Self> {
+    pub fn new(writer: W, title: &str) -> io::Result<Self> {
         let mut html = Html {
             writer: writer,
             span_opened: false,

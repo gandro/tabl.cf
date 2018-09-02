@@ -1,7 +1,7 @@
 use self::html::Html;
 use bytes::Bytes;
 use std::io::{self, Write};
-use termcolor::{Ansi, Color, ColorSpec, NoColor, WriteColor};
+use termcolor::{Ansi, ColorSpec, NoColor, WriteColor};
 
 mod html;
 
@@ -22,10 +22,10 @@ impl Terminal {
         }
     }
 
-    pub fn html() -> Self {
+    pub fn html(title: &str) -> Self {
         Terminal {
             w: TerminalImpl::Html(
-                Html::new(Vec::new(), "<todo title>").expect("writing to vec should not fail"),
+                Html::new(Vec::new(), title).expect("writing to vec should not fail"),
             ),
         }
     }

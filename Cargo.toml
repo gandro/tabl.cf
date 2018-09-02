@@ -1,6 +1,6 @@
 [package]
 authors = ["Sebastian Wicki <gandro@gmx.net>"]
-name = "depart-sh"
+name = "tabl-cf"
 version = "0.1.0"
 
 [dependencies]
